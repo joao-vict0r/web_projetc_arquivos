@@ -1,11 +1,9 @@
-from flask import Flask, request, send_file, render_template
+import zipfile
+import ffmpeg
+from flask import Flask, request, send_file, render_template, after_this_request
 import os
 from werkzeug.utils import secure_filename
 from io import BytesIO
-
-# Instale as dependências: pdf2docx, python-docx, pypdf
-# pip install flask pdf2docx python-docx pypdf
-
 from pdf2docx import Converter
 from docx import Document
 from pypdf import PdfWriter, PdfReader
@@ -14,48 +12,119 @@ app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
- # HTML agora está em templates/index.html
-
 @app.route('/', methods=['GET'])
 def index():
-	return render_template('index.html')
+    return render_template('index.html')
 
 @app.route('/convert', methods=['POST'])
 def convert():
-	file = request.files['file']
-	action = request.form['action']
-	filename = secure_filename(file.filename)
-	filepath = os.path.join(UPLOAD_FOLDER, filename)
-	file.save(filepath)
+    action = request.form['action']
+    name_without_ext = None
+    filepaths = []
+    filenames = []
+    # Suporte a múltiplos arquivos para ZIP
+    if action == 'zipfile':
+        files = request.files.getlist('file')
+        for file in files:
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(UPLOAD_FOLDER, filename)
+            file.save(filepath)
+            filepaths.append(filepath)
+            filenames.append(filename)
+        name_without_ext = 'arquivos'
+    else:
+        file = request.files['file']
+        filename = secure_filename(file.filename)
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(filepath)
+        filepaths.append(filepath)
+        filenames.append(filename)
+        name_without_ext = os.path.splitext(filename)[0]
 
-	if action == 'pdf2word' and filename.lower().endswith('.pdf'):
-		docx_path = os.path.join(UPLOAD_FOLDER, filename + '.docx')
-		cv = Converter(filepath)
-		cv.convert(docx_path, start=0, end=None)
-		cv.close()
-		return send_file(docx_path, as_attachment=True)
-	elif action == 'word2pdf' and filename.lower().endswith('.docx'):
-		pdf_path = os.path.join(UPLOAD_FOLDER, filename + '.pdf')
-		doc = Document(filepath)
-		# Simples: converte cada parágrafo em uma página PDF
-		pdf_writer = PdfWriter()
-		for para in doc.paragraphs:
-			# Adiciona texto como página (simples, sem formatação)
-			from reportlab.pdfgen import canvas
-			from reportlab.lib.pagesizes import letter
-			packet = BytesIO()
-			can = canvas.Canvas(packet, pagesize=letter)
-			can.drawString(100, 750, para.text)
-			can.save()
-			packet.seek(0)
-			pdf_reader = PdfReader(packet)
-			pdf_writer.add_page(pdf_reader.pages[0])
-		with open(pdf_path, 'wb') as f:
-			pdf_writer.write(f)
-		return send_file(pdf_path, as_attachment=True)
-		# ...existing code...
-	else:
-		return 'Arquivo ou ação inválida. Envie PDF ou DOCX.', 400
+    if action == 'zipfile':
+        zip_path = os.path.join(UPLOAD_FOLDER, f"{name_without_ext}.zip")
+        try:
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for fp, fn in zip(filepaths, filenames):
+                    zipf.write(fp, arcname=fn)
+            @after_this_request
+            def cleanup(response):
+                try:
+                    for fp in filepaths:
+                        os.remove(fp)
+                    os.remove(zip_path)
+                except Exception:
+                    pass
+                return response
+            return send_file(zip_path, as_attachment=True)
+        except Exception as e:
+            return f'Erro ao compactar arquivo: {str(e)}', 500
+
+    elif action == 'pdf2word' and filenames[0].lower().endswith('.pdf'):
+        docx_path = os.path.join(UPLOAD_FOLDER, f"{name_without_ext}.docx")
+        cv = Converter(filepaths[0])
+        cv.convert(docx_path, start=0, end=None)
+        cv.close()
+        @after_this_request
+        def cleanup(response):
+            try:
+                os.remove(filepaths[0])
+                os.remove(docx_path)
+            except Exception:
+                pass
+            return response
+        return send_file(docx_path, as_attachment=True)
+
+    elif action == 'word2pdf' and filenames[0].lower().endswith('.docx'):
+        pdf_path = os.path.join(UPLOAD_FOLDER, f"{name_without_ext}.pdf")
+        doc = Document(filepaths[0])
+        pdf_writer = PdfWriter()
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import letter
+        for para in doc.paragraphs:
+            packet = BytesIO()
+            can = canvas.Canvas(packet, pagesize=letter)
+            can.drawString(100, 750, para.text)
+            can.save()
+            packet.seek(0)
+            pdf_reader = PdfReader(packet)
+            pdf_writer.add_page(pdf_reader.pages[0])
+        with open(pdf_path, 'wb') as f:
+            pdf_writer.write(f)
+        @after_this_request
+        def cleanup(response):
+            try:
+                os.remove(filepaths[0])
+                os.remove(pdf_path)
+            except Exception:
+                pass
+            return response
+        return send_file(pdf_path, as_attachment=True)
+
+    elif action == 'video2mp3' and filenames[0].lower().endswith('.mp4'):
+        mp3_path = os.path.join(UPLOAD_FOLDER, f"{name_without_ext}.mp3")
+        try:
+            (
+                ffmpeg
+                .input(filepaths[0])
+                .output(mp3_path, format='mp3', acodec='libmp3lame', audio_bitrate='128k')
+                .run(overwrite_output=True)
+            )
+            @after_this_request
+            def cleanup(response):
+                try:
+                    os.remove(filepaths[0])
+                    os.remove(mp3_path)
+                except Exception:
+                    pass
+                return response
+            return send_file(mp3_path, as_attachment=True)
+        except Exception as e:
+            return f'Erro ao converter vídeo: {str(e)}', 500
+
+    else:
+        return 'Arquivo ou ação inválida. Envie PDF, DOCX, MP4 ou selecione ZIP.', 400
 
 if __name__ == '__main__':
-	app.run(port=5001, debug=True)
+    #app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)

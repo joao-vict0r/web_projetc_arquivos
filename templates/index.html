@@ -17,21 +17,68 @@
         <div class="card">
             <div class="card-body">
                 <h3 class="card-title text-center mb-4">Conversor PDF &lt;-&gt; Word &lt;-&gt; MP3</h3>
-                <form method="post" enctype="multipart/form-data" action="/convert">
+                <form id="convertForm" method="post" enctype="multipart/form-data" action="/convert">
                     <div class="mb-3">
                         <label for="file" class="form-label">Selecione o arquivo</label>
-                        <input type="file" class="form-control" id="file" name="file" required>
+                        <input type="file" class="form-control" id="file" name="file" required multiple>
                     </div>
                     <div class="mb-3">
                         <label for="action" class="form-label">Tipo de conversão</label>
                         <select class="form-select" id="action" name="action">
                             <option value="pdf2word">PDF para Word</option>
                             <option value="word2pdf">Word para PDF</option>
-                            <option value="video2mp3">Vídeo (MP4) para MP3</option>
+                            <option value="video2mp3">Vídeo (MP4) para MP3(Beta)</option>
+                            <option value="zipfile">Compactar arquivos (ZIP)</option>
                         </select>
+                    </div>
+                    <div class="mb-3" id="progress-container" style="display:none;">
+                        <label class="form-label">Progresso da conversão</label>
+                        <div class="progress">
+                            <div id="progress-bar" class="progress-bar bg-success" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                        </div>
                     </div>
                     <button type="submit" class="btn btn-primary">Converter</button>
                 </form>
+                <script>
+                document.getElementById('convertForm').addEventListener('submit', function(e) {
+                    var action = document.getElementById('action').value;
+                    if (action === 'video2mp3' || action === 'zipfile') {
+                        e.preventDefault();
+                        var form = e.target;
+                        var formData = new FormData(form);
+                        var xhr = new XMLHttpRequest();
+                        var progressBar = document.getElementById('progress-bar');
+                        var progressContainer = document.getElementById('progress-container');
+                        progressContainer.style.display = 'block';
+                        xhr.open('POST', '/convert', true);
+                        xhr.responseType = 'blob';
+                        xhr.upload.onprogress = function(e) {
+                            if (e.lengthComputable) {
+                                var percent = Math.round((e.loaded / e.total) * 100);
+                                progressBar.style.width = percent + '%';
+                                progressBar.setAttribute('aria-valuenow', percent);
+                                progressBar.textContent = percent + '%';
+                            }
+                        };
+                        xhr.onload = function() {
+                            if (xhr.status === 200) {
+                                progressBar.style.width = '100%';
+                                progressBar.textContent = '100%';
+                                var blob = xhr.response;
+                                var link = document.createElement('a');
+                                link.href = window.URL.createObjectURL(blob);
+                                link.download = (action === 'zipfile') ? 'arquivos.zip' : 'audio.mp3';
+                                link.click();
+                            } else {
+                                progressBar.classList.remove('bg-success');
+                                progressBar.classList.add('bg-danger');
+                                progressBar.textContent = 'Erro';
+                            }
+                        };
+                        xhr.send(formData);
+                    }
+                });
+                </script>
             </div>
         </div>
         <footer class="text-center mt-4 text-muted">
