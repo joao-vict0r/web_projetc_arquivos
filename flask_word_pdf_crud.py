@@ -3,10 +3,8 @@ import os
 from werkzeug.utils import secure_filename
 from io import BytesIO
 
-
-# Instale as dependências: pdf2docx, python-docx, pypdf, moviepy
-# pip install flask pdf2docx python-docx pypdf moviepy
-from moviepy.editor import VideoFileClip
+# Instale as dependências: pdf2docx, python-docx, pypdf
+# pip install flask pdf2docx python-docx pypdf
 
 from pdf2docx import Converter
 from docx import Document
@@ -55,17 +53,9 @@ def convert():
 		with open(pdf_path, 'wb') as f:
 			pdf_writer.write(f)
 		return send_file(pdf_path, as_attachment=True)
-	elif action == 'video2mp3' and filename.lower().endswith('.mp4'):
-		mp3_path = os.path.join(UPLOAD_FOLDER, filename + '.mp3')
-		try:
-			clip = VideoFileClip(filepath)
-			clip.audio.write_audiofile(mp3_path)
-			clip.close()
-			return send_file(mp3_path, as_attachment=True)
-		except Exception as e:
-			return f'Erro ao converter vídeo: {str(e)}', 500
+		# ...existing code...
 	else:
-		return 'Arquivo ou ação inválida. Envie PDF, DOCX ou MP4.', 400
+		return 'Arquivo ou ação inválida. Envie PDF ou DOCX.', 400
 
 if __name__ == '__main__':
 	app.run(port=5001, debug=True)
