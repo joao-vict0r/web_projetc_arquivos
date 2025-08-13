@@ -94,7 +94,7 @@
                                 <form method="POST" action="/convert" enctype="multipart/form-data">
                                     <div class="mb-3">
                                         <label for="file" class="form-label" id="fileLabel">Selecione o arquivo (PDF ou DOCX):</label>
-                                        <input type="file" class="form-control" id="file" name="file" required>
+                                        <input type="file" class="form-control" id="file" name="file" required onchange="autoSelectAction()">
                                     </div>
                                     <div class="mb-3">
                                         <label for="action" class="form-label" id="actionLabel">Tipo de conversão:</label>
@@ -103,6 +103,23 @@
                                             <option value="word2pdf">Word para PDF</option>
                                         </select>
                                     </div>
+        <script>
+            // ...existing code...
+
+            // Detecta o tipo de arquivo e seleciona a ação automaticamente
+            function autoSelectAction() {
+                const fileInput = document.getElementById('file');
+                const actionSelect = document.getElementById('action');
+                if (fileInput.files.length > 0) {
+                    const fname = fileInput.files[0].name.toLowerCase();
+                    if (fname.endsWith('.pdf')) {
+                        actionSelect.value = 'pdf2word';
+                    } else if (fname.endsWith('.docx')) {
+                        actionSelect.value = 'word2pdf';
+                    }
+                }
+            }
+        </script>
                                     <button type="submit" class="btn btn-primary w-100">Converter</button>
                                 </form>
                             </div>
