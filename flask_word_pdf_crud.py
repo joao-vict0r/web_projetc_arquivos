@@ -1,3 +1,62 @@
+from flask import Flask, request, send_file, render_template
+import os
+from werkzeug.utils import secure_filename
+from pdf2docx import Converter
+from docx import Document
+from io import BytesIO
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+
+app = Flask(__name__)
+UPLOAD_FOLDER = 'uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+@app.route('/', methods=['GET'])
+def index():
+    return render_template('index.html')
+
+@app.route('/convert', methods=['POST'])
+def convert():
+    action = request.form.get('action')
+    file = request.files['file']
+    filename = secure_filename(file.filename)
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    file.save(filepath)
+    name_without_ext = os.path.splitext(filename)[0]
+
+    if action == 'pdf2word' and filename.lower().endswith('.pdf'):
+        docx_path = os.path.join(UPLOAD_FOLDER, f"{name_without_ext}.docx")
+        try:
+            cv = Converter(filepath)
+            cv.convert(docx_path, start=0, end=None)
+            cv.close()
+        except Exception as e:
+            return f'Erro ao converter PDF: {e}', 500
+        return send_file(docx_path, as_attachment=True)
+
+    elif action == 'word2pdf' and filename.lower().endswith('.docx'):
+        pdf_path = os.path.join(UPLOAD_FOLDER, f"{name_without_ext}.pdf")
+        try:
+            doc = Document(filepath)
+            packet = BytesIO()
+            can = canvas.Canvas(packet, pagesize=letter)
+            y = 750
+            for para in doc.paragraphs:
+                can.drawString(100, y, para.text)
+                y -= 20
+            can.save()
+            packet.seek(0)
+            with open(pdf_path, 'wb') as f:
+                f.write(packet.read())
+        except Exception as e:
+            return f'Erro ao converter Word: {e}', 500
+        return send_file(pdf_path, as_attachment=True)
+
+    else:
+        return 'Arquivo ou ação inválida. Envie PDF ou DOCX.', 400
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)
 import zipfile
 import ffmpeg
 from flask import Flask, request, send_file, render_template, after_this_request
@@ -6,7 +65,11 @@ from werkzeug.utils import secure_filename
 from io import BytesIO
 from pdf2docx import Converter
 from docx import Document
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from io import BytesIO
 from pypdf import PdfWriter, PdfReader
+#from docx2pdf import convert
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads'
@@ -77,27 +140,25 @@ def convert():
 
     elif action == 'word2pdf' and filenames[0].lower().endswith('.docx'):
         pdf_path = os.path.join(UPLOAD_FOLDER, f"{name_without_ext}.pdf")
-        doc = Document(filepaths[0])
-        pdf_writer = PdfWriter()
-        from reportlab.pdfgen import canvas
-        from reportlab.lib.pagesizes import letter
-        for para in doc.paragraphs:
-            packet = BytesIO()
-            can = canvas.Canvas(packet, pagesize=letter)
-            can.drawString(100, 750, para.text)
-            can.save()
-            packet.seek(0)
-            pdf_reader = PdfReader(packet)
-            pdf_writer.add_page(pdf_reader.pages[0])
-        with open(pdf_path, 'wb') as f:
-            pdf_writer.write(f)
+        try:
+            doc = Document(filepaths[0])
+            pdf_writer = PdfWriter()
+            for para in doc.paragraphs:
+                packet = BytesIO()
+                can = canvas.Canvas(packet, pagesize=letter)
+                can.drawString(100, 750, para.text)
+                can.save()
+                packet.seek(0)
+                pdf_reader = PdfReader(packet)
+                pdf_writer.add_page(pdf_reader.pages[0])
+            with open(pdf_path, 'wb') as f:
+                pdf_writer.write(f)
+        except Exception as e:
+            return f'Erro ao converter Word: {e}', 500
         @after_this_request
         def cleanup(response):
-            try:
-                os.remove(filepaths[0])
-                os.remove(pdf_path)
-            except Exception:
-                pass
+            os.remove(filepaths[0])
+            os.remove(pdf_path)
             return response
         return send_file(pdf_path, as_attachment=True)
 
