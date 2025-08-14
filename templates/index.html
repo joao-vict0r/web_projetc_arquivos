@@ -106,23 +106,6 @@
                                             <option value="word2pdf">Word para PDF</option>
                                         </select>
                                     </div>
-        <script>
-            // ...existing code...
-
-            // Detecta o tipo de arquivo e seleciona a ação automaticamente
-            function autoSelectAction() {
-                const fileInput = document.getElementById('file');
-                const actionSelect = document.getElementById('action');
-                if (fileInput.files.length > 0) {
-                    const fname = fileInput.files[0].name.toLowerCase();
-                    if (fname.endsWith('.pdf')) {
-                        actionSelect.value = 'pdf2word';
-                    } else if (fname.endsWith('.docx')) {
-                        actionSelect.value = 'word2pdf';
-                    }
-                }
-            }
-        </script>
                                     <button type="submit" class="btn btn-primary w-100">Converter</button>
                                 </form>
                             </div>
@@ -156,9 +139,17 @@
                 document.getElementById('content-converter').style.display = (tab === 'converter') ? '' : 'none';
                 document.getElementById('content-zip').style.display = (tab === 'zip') ? '' : 'none';
                 document.getElementById('content-unzip').style.display = (tab === 'unzip') ? '' : 'none';
-                document.getElementById('tab-converter').classList.toggle('active', tab === 'converter');
-                document.getElementById('tab-zip').classList.toggle('active', tab === 'zip');
-                document.getElementById('tab-unzip').classList.toggle('active', tab === 'unzip');
+                document.getElementById('tab-converter').classList.remove('active');
+                document.getElementById('tab-zip').classList.remove('active');
+                document.getElementById('tab-unzip').classList.remove('active');
+                if(tab === 'converter') document.getElementById('tab-converter').classList.add('active');
+                if(tab === 'zip') document.getElementById('tab-zip').classList.add('active');
+                if(tab === 'unzip') document.getElementById('tab-unzip').classList.add('active');
+            }
+
+            // Seleciona automaticamente a aba vídeo se um vídeo for selecionado
+            function autoSelectVideoAction() {
+                // Pode ser expandido para lógica extra se necessário
             }
         </script>
         <script>

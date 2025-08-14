@@ -1,5 +1,10 @@
 import threading
 import time
+import os
+
+UPLOAD_FOLDER = 'uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
 def limpar_uploads_antigos(pasta=UPLOAD_FOLDER, horas=1):
     """Remove arquivos com mais de X horas da pasta de uploads."""
     agora = time.time()
@@ -174,7 +179,12 @@ def convert():
         except Exception as e:
             return f'Erro ao converter Word: {str(e)}', 500
 
-    elif action == 'video2mp3' and filenames[0].lower().endswith('.mp4'):
+
+    elif action == 'video2mp3':
+        video_exts = ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.3gp', '.mpeg', '.mpg', '.ogv']
+        ext = os.path.splitext(filenames[0])[1].lower()
+        if ext not in video_exts:
+            return f'Formato de vídeo não suportado: {ext}', 400
         mp3_path = os.path.join(UPLOAD_FOLDER, f"{name_without_ext}.mp3")
         try:
             (
