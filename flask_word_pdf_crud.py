@@ -1,3 +1,4 @@
+from flask import url_for, redirect, abort
 from flask import Flask, request, send_file, render_template, after_this_request
 from werkzeug.utils import secure_filename
 from pdf2docx import Converter
@@ -88,21 +89,94 @@ def convert():
         try:
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 zip_ref.extractall(extract_dir)
+            # Remove o ZIP original, mantém extraídos até download
+            os.remove(zip_path)
+            # Lista arquivos extraídos (relativos ao extract_dir)
+            extracted_files = []
+            for root, _, files_in_dir in os.walk(extract_dir):
+                for file_in_dir in files_in_dir:
+                    abs_path = os.path.join(root, file_in_dir)
+                    rel_path = os.path.relpath(abs_path, extract_dir)
+                    extracted_files.append(rel_path)
+            # Salva lista em sessão ou passa por query string
 
-            result_zip_path = os.path.join(UPLOAD_FOLDER, f"descompactado_{name_without_ext}.zip")
-            with zipfile.ZipFile(result_zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                for root, _, files_in_dir in os.walk(extract_dir):
-                    for file_in_dir in files_in_dir:
-                        abs_path = os.path.join(root, file_in_dir)
-                        rel_path = os.path.relpath(abs_path, extract_dir)
-                        zipf.write(abs_path, arcname=rel_path)
-
-            cleanup_files([zip_path, result_zip_path])
-            shutil.rmtree(extract_dir, ignore_errors=True)
-            return send_file(result_zip_path, as_attachment=True)
+            return render_template('unzip_list.html', files=extracted_files, extract_dir=os.path.basename(extract_dir))
         except Exception as e:
             tb = traceback.format_exc()
             return f'Erro ao descompactar: {str(e)}\n{tb}', 500
+
+    elif action == 'zipfile':
+        zip_path = os.path.join(UPLOAD_FOLDER, f"{secure_filename(name_without_ext)}.zip")
+        try:
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for fp, fn in zip(filepaths, filenames):
+                    zipf.write(fp, arcname=secure_filename(fn))
+            cleanup_files(filepaths + [zip_path])
+            mime = mimetypes.guess_type(zip_path)[0] or 'application/zip'
+            return send_file(zip_path, as_attachment=True, download_name=os.path.basename(zip_path), mimetype=mime)
+        except Exception as e:
+            return f'Erro ao compactar: {str(e)}', 500
+
+    elif action == 'pdf2word' and filenames[0].lower().endswith('.pdf'):
+        docx_path = os.path.join(UPLOAD_FOLDER, f"{secure_filename(name_without_ext)}.docx")
+        try:
+            cv = Converter(filepaths[0])
+            cv.convert(docx_path, start=0, end=None)
+            cv.close()
+            cleanup_files([filepaths[0], docx_path])
+            mime = mimetypes.guess_type(docx_path)[0] or 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            return send_file(docx_path, as_attachment=True, download_name=os.path.basename(docx_path), mimetype=mime)
+        except Exception as e:
+            return f'Erro ao converter PDF: {str(e)}', 500
+
+    elif action == 'word2pdf' and filenames[0].lower().endswith('.docx'):
+        pdf_path = os.path.join(UPLOAD_FOLDER, f"{secure_filename(name_without_ext)}.pdf")
+        try:
+            doc = Document(filepaths[0])
+            pdf_writer = PdfWriter()
+            for para in doc.paragraphs:
+                packet = BytesIO()
+                can = canvas.Canvas(packet, pagesize=letter)
+                can.drawString(100, 750, para.text)
+                can.save()
+                packet.seek(0)
+                pdf_reader = PdfReader(packet)
+                pdf_writer.add_page(pdf_reader.pages[0])
+            with open(pdf_path, 'wb') as f:
+                pdf_writer.write(f)
+            cleanup_files([filepaths[0], pdf_path])
+            mime = mimetypes.guess_type(pdf_path)[0] or 'application/pdf'
+            return send_file(pdf_path, as_attachment=True, download_name=os.path.basename(pdf_path), mimetype=mime)
+        except Exception as e:
+            return f'Erro ao converter Word: {str(e)}', 500
+
+    elif action == 'video2mp3' and filenames[0].lower().endswith('.mp4'):
+        mp3_path = os.path.join(UPLOAD_FOLDER, f"{name_without_ext}.mp3")
+        try:
+            (
+                ffmpeg
+                .input(filepaths[0])
+                .output(mp3_path, format='mp3', acodec='libmp3lame', audio_bitrate='128k')
+                .run(overwrite_output=True)
+            )
+            cleanup_files([filepaths[0], mp3_path])
+            return send_file(mp3_path, as_attachment=True)
+        except Exception as e:
+            return f'Erro ao converter vídeo: {str(e)}', 500
+
+    return 'Arquivo ou ação inválida. Envie PDF, DOCX, MP4 ou selecione ZIP.', 400
+
+# Rota para download seguro de arquivos extraídos
+@app.route('/download_extracted/<extract_dir>/<path:filename>')
+def download_extracted(extract_dir, filename):
+    # Garante que o nome do diretório começa com 'extract_' e não tem barras
+    safe_dir = f"extract_{secure_filename(extract_dir.replace('extract_', ''))}"
+    safe_extract_dir = os.path.join(UPLOAD_FOLDER, safe_dir)
+    abs_path = os.path.abspath(os.path.join(safe_extract_dir, filename))
+    # Garante que o arquivo está dentro do diretório permitido e existe
+    if not abs_path.startswith(os.path.abspath(safe_extract_dir)) or not os.path.isfile(abs_path):
+        return 'Arquivo não encontrado ou acesso negado.', 404
+    return send_file(abs_path, as_attachment=True)
 
     # ==============================
     # COMPACTAR ZIP
