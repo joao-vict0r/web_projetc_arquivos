@@ -1,3 +1,26 @@
+import threading
+import time
+def limpar_uploads_antigos(pasta=UPLOAD_FOLDER, horas=1):
+    """Remove arquivos com mais de X horas da pasta de uploads."""
+    agora = time.time()
+    limite = horas * 3600
+    for root, _, files in os.walk(pasta):
+        for nome in files:
+            caminho = os.path.join(root, nome)
+            try:
+                if os.path.isfile(caminho):
+                    if agora - os.path.getmtime(caminho) > limite:
+                        os.remove(caminho)
+            except Exception:
+                pass
+
+def agendar_limpeza_uploads():
+    def loop():
+        while True:
+            limpar_uploads_antigos()
+            time.sleep(5)  # roda a cada 5 segundos
+    t = threading.Thread(target=loop, daemon=True)
+    t.start()
 from flask import url_for, redirect, abort
 from flask import Flask, request, send_file, render_template, after_this_request
 from werkzeug.utils import secure_filename
@@ -14,9 +37,10 @@ from io import BytesIO
 import shutil
 import traceback
 
-app = Flask(__name__)
+
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app = Flask(__name__)
 
 @app.route('/')
 def index():
@@ -55,7 +79,7 @@ def convert():
 
     filepaths = []
     filenames = []
-    allowed_exts = {'.pdf', '.docx', '.zip', '.mp4'}
+    allowed_exts = {'.pdf', '.docx', '.zip', '.mp4', '.png', '.jpg', '.jpeg', '.txt', '.csv', '.xls', '.xlsx', '.ppt', '.pptx', '.gif', '.bmp', '.rtf', '.odt', '.ods', '.odp', '.svg', '.webp', '.mp3', '.wav', '.avi', '.mov', '.wmv', '.flv', '.mkv', '.json', '.xml', '.html', '.htm', '.md', '.yml', '.yaml', '.ini', '.log'}
 
     for file in files:
         filename = secure_filename(file.filename)
@@ -252,4 +276,5 @@ def download_extracted(extract_dir, filename):
     return 'Arquivo ou ação inválida. Envie PDF, DOCX, MP4 ou selecione ZIP.', 400
 
 if __name__ == '__main__':
+    agendar_limpeza_uploads()
     app.run(debug=True, host='0.0.0.0', port=5000)
