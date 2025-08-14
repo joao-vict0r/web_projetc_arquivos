@@ -1,4 +1,4 @@
-from flask import Flask, request, send_file, render_template
+from flask import Flask, request, send_file, render_template, after_this_request
 from werkzeug.utils import secure_filename
 from pdf2docx import Converter
 from docx import Document
@@ -10,7 +10,8 @@ import zipfile
 import os
 import mimetypes
 from io import BytesIO
-
+import shutil
+import traceback
 
 app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads'
@@ -21,12 +22,10 @@ def index():
     return render_template('index.html')
 
 def cleanup_files(paths):
-    from flask import after_this_request
     @after_this_request
     def cleanup(response):
         for path in paths:
             try:
-                # Só remove arquivos dentro do diretório UPLOAD_FOLDER
                 if os.path.abspath(path).startswith(os.path.abspath(UPLOAD_FOLDER)):
                     os.remove(path)
             except Exception:
@@ -36,24 +35,33 @@ def cleanup_files(paths):
 @app.route('/convert', methods=['POST'])
 def convert():
     action = request.form.get('action')
-    files = request.files.getlist('file')
-    if not files or files[0].filename == '':
+
+    # ==============================
+    # SELEÇÃO DE ARQUIVOS POR AÇÃO
+    # ==============================
+    if action in ('pdf2word', 'word2pdf', 'video2mp3', 'unzipfile'):
+        files = request.files.getlist('file')
+    elif action == 'zipfile':
         files = request.files.getlist('zipfiles')
-        if not files or files[0].filename == '':
-            return 'Nenhum arquivo enviado para compactar ou campo incorreto no formulário.', 400
+    else:
+        return 'Ação inválida ou não suportada.', 400
+
+    # ==============================
+    # VERIFICAÇÃO DE ARQUIVOS
+    # ==============================
+    if not files or files[0].filename == '':
+        return 'Nenhum arquivo enviado.', 400
 
     filepaths = []
     filenames = []
-
-
     allowed_exts = {'.pdf', '.docx', '.zip', '.mp4'}
+
     for file in files:
         filename = secure_filename(file.filename)
         ext = os.path.splitext(filename)[1].lower()
         if ext not in allowed_exts:
             return f'Extensão de arquivo não permitida: {ext}', 400
         filepath = os.path.join(UPLOAD_FOLDER, filename)
-        # Garante que o arquivo será salvo apenas dentro do diretório permitido
         if not os.path.abspath(filepath).startswith(os.path.abspath(UPLOAD_FOLDER)):
             return 'Caminho de arquivo inválido.', 400
         file.save(filepath)
@@ -65,6 +73,40 @@ def convert():
 
     name_without_ext = os.path.splitext(filenames[0])[0]
 
+    # ==============================
+    # DESCOMPACTAR ZIP
+    # ==============================
+    if action == 'unzipfile':
+        zip_path = filepaths[0]
+        # Verifica se realmente é ZIP válido
+        if not zipfile.is_zipfile(zip_path):
+            os.remove(zip_path)
+            return 'O arquivo enviado não é um ZIP válido.', 400
+
+        extract_dir = os.path.join(UPLOAD_FOLDER, f"extract_{name_without_ext}")
+        os.makedirs(extract_dir, exist_ok=True)
+        try:
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_dir)
+
+            result_zip_path = os.path.join(UPLOAD_FOLDER, f"descompactado_{name_without_ext}.zip")
+            with zipfile.ZipFile(result_zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for root, _, files_in_dir in os.walk(extract_dir):
+                    for file_in_dir in files_in_dir:
+                        abs_path = os.path.join(root, file_in_dir)
+                        rel_path = os.path.relpath(abs_path, extract_dir)
+                        zipf.write(abs_path, arcname=rel_path)
+
+            cleanup_files([zip_path, result_zip_path])
+            shutil.rmtree(extract_dir, ignore_errors=True)
+            return send_file(result_zip_path, as_attachment=True)
+        except Exception as e:
+            tb = traceback.format_exc()
+            return f'Erro ao descompactar: {str(e)}\n{tb}', 500
+
+    # ==============================
+    # COMPACTAR ZIP
+    # ==============================
     if action == 'zipfile':
         zip_path = os.path.join(UPLOAD_FOLDER, f"{secure_filename(name_without_ext)}.zip")
         try:
@@ -77,7 +119,10 @@ def convert():
         except Exception as e:
             return f'Erro ao compactar: {str(e)}', 500
 
-    elif action == 'pdf2word' and filenames[0].lower().endswith('.pdf'):
+    # ==============================
+    # PDF → Word
+    # ==============================
+    if action == 'pdf2word' and filenames[0].lower().endswith('.pdf'):
         docx_path = os.path.join(UPLOAD_FOLDER, f"{secure_filename(name_without_ext)}.docx")
         try:
             cv = Converter(filepaths[0])
@@ -89,7 +134,10 @@ def convert():
         except Exception as e:
             return f'Erro ao converter PDF: {str(e)}', 500
 
-    elif action == 'word2pdf' and filenames[0].lower().endswith('.docx'):
+    # ==============================
+    # Word → PDF
+    # ==============================
+    if action == 'word2pdf' and filenames[0].lower().endswith('.docx'):
         pdf_path = os.path.join(UPLOAD_FOLDER, f"{secure_filename(name_without_ext)}.pdf")
         try:
             doc = Document(filepaths[0])
@@ -110,7 +158,10 @@ def convert():
         except Exception as e:
             return f'Erro ao converter Word: {str(e)}', 500
 
-    elif action == 'video2mp3' and filenames[0].lower().endswith('.mp4'):
+    # ==============================
+    # MP4 → MP3
+    # ==============================
+    if action == 'video2mp3' and filenames[0].lower().endswith('.mp4'):
         mp3_path = os.path.join(UPLOAD_FOLDER, f"{name_without_ext}.mp3")
         try:
             (

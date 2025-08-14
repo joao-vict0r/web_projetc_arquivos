@@ -87,6 +87,9 @@
                                 <li class="nav-item">
                                     <a class="nav-link" id="tab-zip" href="#" onclick="showTab('zip')">Compactador ZIP</a>
                                 </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" id="tab-unzip" href="#" onclick="showTab('unzip')">Descompactar ZIP</a>
+                                </li>
                             </ul>
                         </div>
                         <div class="card-body">
@@ -133,6 +136,16 @@
                                     <button type="submit" class="btn btn-success w-100">Compactar e Baixar ZIP</button>
                                 </form>
                             </div>
+                            <div id="content-unzip" style="display:none;">
+                                <form method="POST" action="/convert" enctype="multipart/form-data">
+                                    <input type="hidden" name="action" value="unzipfile">
+                                    <div class="mb-3">
+                                        <label for="unzipfile" class="form-label">Selecione um arquivo ZIP para descompactar:</label>
+                                        <input type="file" class="form-control" id="unzipfile" name="file" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-warning w-100">Descompactar e Baixar Conteúdo</button>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -142,8 +155,10 @@
             function showTab(tab) {
                 document.getElementById('content-converter').style.display = (tab === 'converter') ? '' : 'none';
                 document.getElementById('content-zip').style.display = (tab === 'zip') ? '' : 'none';
+                document.getElementById('content-unzip').style.display = (tab === 'unzip') ? '' : 'none';
                 document.getElementById('tab-converter').classList.toggle('active', tab === 'converter');
                 document.getElementById('tab-zip').classList.toggle('active', tab === 'zip');
+                document.getElementById('tab-unzip').classList.toggle('active', tab === 'unzip');
             }
         </script>
         <script>
