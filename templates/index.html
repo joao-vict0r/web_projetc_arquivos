@@ -1,6 +1,39 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
+    <style>
+        @media (max-width: 991px) {
+            .sidebar-left, .sidebar-right {
+                display: none !important;
+            }
+        }
+    </style>
+    <style>
+        .sidebar-left {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 120px;
+            height: 100vh;
+            background: transparent;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .sidebar-right {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 120px;
+            height: 100vh;
+            background: transparent;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Conversor PDF &lt;-&gt; Word</title>
@@ -71,6 +104,32 @@
     </style>
 </head>
 <body>
+    <!-- Banners laterais para desktop/tablet -->
+    <div class="sidebar-left d-none d-lg-flex">
+        <img src="https://via.placeholder.com/120x600?text=Anuncio+Esquerda" alt="Propaganda Esquerda" style="width:120px;">
+    </div>
+    <div class="sidebar-right d-none d-lg-flex">
+        <img src="https://via.placeholder.com/120x600?text=Anuncio+Direita" alt="Propaganda Direita" style="width:120px;">
+    </div>
+    <!-- Banner inferior para mobile -->
+    <div class="banner-bottom d-block d-lg-none">
+        <img src="https://via.placeholder.com/320x100?text=Anuncio+Mobile" alt="Propaganda Mobile" style="width:100%;max-width:400px;display:block;margin:0 auto;">
+    </div>
+    <style>
+        .banner-bottom {
+            position: fixed;
+            left: 0;
+            bottom: 0;
+            width: 100vw;
+            background: transparent;
+            z-index: 999;
+            text-align: center;
+            padding-bottom: env(safe-area-inset-bottom, 0); /* suporte para iPhone */
+        }
+        @media (min-width: 992px) {
+            .banner-bottom { display: none !important; }
+        }
+    </style>
     <body class="bg-light" id="mainBody">
         <button class="theme-toggle-btn" id="themeBtn" title="Alternar tema">
             <i class="bi bi-moon-fill" id="themeIcon"></i>
@@ -104,6 +163,7 @@
                                         <select class="form-select" id="action" name="action" required>
                                             <option value="pdf2word">PDF para Word</option>
                                             <option value="word2pdf">Word para PDF</option>
+                                            <option value="excel2pdf">Planilha para PDF (.xls, .xlsx, .csv, .ods)</option>
                                         </select>
                                     </div>
                                     <button type="submit" class="btn btn-primary w-100">Converter</button>

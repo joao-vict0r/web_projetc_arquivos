@@ -1,23 +1,32 @@
+
+import pandas as pd
+from fpdf import FPDF
 import threading
 import time
 import os
 
-UPLOAD_FOLDER = 'uploads'
+# Define o diretório de uploads relativo ao diretório deste script
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-def limpar_uploads_antigos(pasta=UPLOAD_FOLDER, horas=1):
+def limpar_uploads_antigos(pasta=UPLOAD_FOLDER, horas=(5/3600)):
     """Remove arquivos com mais de X horas da pasta de uploads."""
     agora = time.time()
     limite = horas * 3600
+    print(f"[LIMPEZA] Iniciando limpeza em {pasta} (limite: {horas}h)")
     for root, _, files in os.walk(pasta):
         for nome in files:
             caminho = os.path.join(root, nome)
             try:
                 if os.path.isfile(caminho):
-                    if agora - os.path.getmtime(caminho) > limite:
+                    idade = agora - os.path.getmtime(caminho)
+                    print(f"[LIMPEZA] Verificando: {caminho} (idade: {idade:.1f}s)")
+                    if idade > limite:
+                        print(f"[LIMPEZA] Removendo: {caminho}")
                         os.remove(caminho)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[LIMPEZA] Erro ao tentar remover {caminho}: {e}")
 
 def agendar_limpeza_uploads():
     def loop():
@@ -69,7 +78,7 @@ def convert():
     # ==============================
     # SELEÇÃO DE ARQUIVOS POR AÇÃO
     # ==============================
-    if action in ('pdf2word', 'word2pdf', 'video2mp3', 'unzipfile'):
+    if action in ('pdf2word', 'word2pdf', 'video2mp3', 'unzipfile', 'excel2pdf'):
         files = request.files.getlist('file')
     elif action == 'zipfile':
         files = request.files.getlist('zipfiles')
@@ -178,6 +187,43 @@ def convert():
             return send_file(pdf_path, as_attachment=True, download_name=os.path.basename(pdf_path), mimetype=mime)
         except Exception as e:
             return f'Erro ao converter Word: {str(e)}', 500
+
+    # ==============================
+    # XLS/XLSX/CSV/ODS → PDF
+    # ==============================
+    elif action == 'excel2pdf' and filenames[0].lower().endswith(('.xls', '.xlsx', '.csv', '.ods')):
+        pdf_path = os.path.join(UPLOAD_FOLDER, f"{secure_filename(name_without_ext)}.pdf")
+        try:
+            ext = os.path.splitext(filenames[0])[1].lower()
+            if ext == '.csv':
+                df = pd.read_csv(filepaths[0])
+            elif ext in ('.xls', '.xlsx'):
+                df = pd.read_excel(filepaths[0])
+            elif ext == '.ods':
+                df = pd.read_excel(filepaths[0], engine='odf')
+            else:
+                return 'Formato não suportado para conversão.', 400
+
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font('Arial', size=10)
+            col_width = pdf.w / (len(df.columns) + 1)
+            row_height = pdf.font_size * 1.5
+            # Cabeçalho
+            for col in df.columns:
+                pdf.cell(col_width, row_height, str(col), border=1)
+            pdf.ln(row_height)
+            # Dados
+            for i, row in df.iterrows():
+                for item in row:
+                    pdf.cell(col_width, row_height, str(item), border=1)
+                pdf.ln(row_height)
+            pdf.output(pdf_path)
+            cleanup_files([filepaths[0], pdf_path])
+            mime = mimetypes.guess_type(pdf_path)[0] or 'application/pdf'
+            return send_file(pdf_path, as_attachment=True, download_name=os.path.basename(pdf_path), mimetype=mime)
+        except Exception as e:
+            return f'Erro ao converter planilha: {str(e)}', 500
 
 
     elif action == 'video2mp3':
