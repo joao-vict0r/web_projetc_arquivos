@@ -17,7 +17,7 @@
                         {% for f in files %}
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             <span>{{ f }}</span>
-                            <a class="btn btn-success btn-sm" href="{{ url_for('download_extracted', extract_dir=extract_dir, filename=f) }}">Baixar</a>
+                            <a class="btn btn-success btn-sm" href="{{ url_for('zip.download_extracted', extract_dir=extract_dir, filename=f) }}">Baixar</a>
                         </li>
                         {% endfor %}
                     </ul>

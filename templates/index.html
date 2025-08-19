@@ -251,8 +251,9 @@
                 return localStorage.getItem('themeDark') === '1';
             }
 
-            // Inicializar tema
-            setDarkMode(getThemePref());
+
+            // Sempre iniciar no modo claro
+            setDarkMode(false);
 
             themeBtn.addEventListener('click', function() {
                 const isDark = !mainBody.classList.contains('dark');
