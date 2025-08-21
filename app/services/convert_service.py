@@ -84,7 +84,9 @@ def handle_conversion(request):
 		except Exception as e:
 			return f'Erro ao compactar: {str(e)}', 500
 
-	elif action == 'pdf2word' and filenames[0].lower().endswith('.pdf'):
+	elif action == 'pdf2word':
+		if not filenames[0].lower().endswith('.pdf'):
+			return "<script>alert('Arquivo inválido para esta conversão. Selecione um arquivo PDF.');window.history.back();</script>", 400
 		docx_path = os.path.join(UPLOAD_FOLDER, f"{secure_filename(name_without_ext)}.docx")
 		try:
 			cv = Converter(filepaths[0])
@@ -96,7 +98,9 @@ def handle_conversion(request):
 		except Exception as e:
 			return f'Erro ao converter PDF: {str(e)}', 500
 
-	elif action == 'word2pdf' and filenames[0].lower().endswith('.docx'):
+	elif action == 'word2pdf':
+		if not filenames[0].lower().endswith('.docx'):
+			return "<script>alert('Arquivo inválido para esta conversão. Selecione um arquivo DOCX.');window.history.back();</script>", 400
 		pdf_path = os.path.join(UPLOAD_FOLDER, f"{secure_filename(name_without_ext)}.pdf")
 		try:
 			doc = Document(filepaths[0])
@@ -117,7 +121,9 @@ def handle_conversion(request):
 		except Exception as e:
 			return f'Erro ao converter Word: {str(e)}', 500
 
-	elif action == 'excel2pdf' and filenames[0].lower().endswith(('.xls', '.xlsx', '.csv', '.ods')):
+	elif action == 'excel2pdf':
+		if not filenames[0].lower().endswith(('.xls', '.xlsx', '.csv', '.ods')):
+			return "<script>alert('Arquivo inválido para esta conversão. Selecione um arquivo de planilha (xls, xlsx, csv, ods).');window.history.back();</script>", 400
 		pdf_path = os.path.join(UPLOAD_FOLDER, f"{secure_filename(name_without_ext)}.pdf")
 		try:
 			ext = os.path.splitext(filenames[0])[1].lower()
