@@ -1,9 +1,13 @@
+<<<<<<< HEAD
 import pandas as pd
 from fpdf import FPDF
 import threading
 import time
 import os
 from flask import Flask, request, send_file, render_template, after_this_request, url_for, redirect, abort
+=======
+from flask import Flask, request, send_file, render_template
+>>>>>>> f276bff4b27fc4b2b14f2c6e2c4c24c9eaa78213
 from werkzeug.utils import secure_filename
 from pdf2docx import Converter
 from docx import Document
@@ -12,6 +16,7 @@ from reportlab.lib.pagesizes import letter
 from pypdf import PdfWriter, PdfReader
 import ffmpeg
 import zipfile
+<<<<<<< HEAD
 import mimetypes
 from io import BytesIO
 import shutil
@@ -50,16 +55,37 @@ def agendar_limpeza_uploads():
 @app.route("/")
 def index():
     return render_template("index.html")
+=======
+import os
+import mimetypes
+from io import BytesIO
+
+
+app = Flask(__name__)
+UPLOAD_FOLDER = 'uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+>>>>>>> f276bff4b27fc4b2b14f2c6e2c4c24c9eaa78213
 def cleanup_files(paths):
+    from flask import after_this_request
     @after_this_request
     def cleanup(response):
         for path in paths:
             try:
+<<<<<<< HEAD
+=======
+                # Só remove arquivos dentro do diretório UPLOAD_FOLDER
+>>>>>>> f276bff4b27fc4b2b14f2c6e2c4c24c9eaa78213
                 if os.path.abspath(path).startswith(os.path.abspath(UPLOAD_FOLDER)):
                     os.remove(path)
             except Exception:
                 pass
         return response
+<<<<<<< HEAD
     return cleanup
 @app.route('/convert', methods=['POST'])
 def convert():
@@ -72,17 +98,34 @@ def convert():
         return 'Ação inválida ou não suportada.', 400
     if not files or files[0].filename == '':
         return 'Nenhum arquivo enviado.', 400
+=======
+
+@app.route('/convert', methods=['POST'])
+def convert():
+    action = request.form.get('action')
+    files = request.files.getlist('file')
+    if not files or files[0].filename == '':
+        files = request.files.getlist('zipfiles')
+        if not files or files[0].filename == '':
+            return 'Nenhum arquivo enviado para compactar ou campo incorreto no formulário.', 400
+>>>>>>> f276bff4b27fc4b2b14f2c6e2c4c24c9eaa78213
 
     filepaths = []
     filenames = []
     allowed_exts = {'.pdf', '.docx', '.zip', '.mp4', '.png', '.jpg', '.jpeg', '.txt', '.csv', '.xls', '.xlsx', '.ppt', '.pptx', '.gif', '.bmp', '.rtf', '.odt', '.ods', '.odp', '.svg', '.webp', '.mp3', '.wav', '.avi', '.mov', '.wmv', '.flv', '.mkv', '.json', '.xml', '.html', '.htm', '.md', '.yml', '.yaml', '.ini', '.log'}
 
+
+    allowed_exts = {'.pdf', '.docx', '.zip', '.mp4'}
     for file in files:
         filename = secure_filename(file.filename)
         ext = os.path.splitext(filename)[1].lower()
         if ext not in allowed_exts:
             return f'Extensão de arquivo não permitida: {ext}', 400
         filepath = os.path.join(UPLOAD_FOLDER, filename)
+<<<<<<< HEAD
+=======
+        # Garante que o arquivo será salvo apenas dentro do diretório permitido
+>>>>>>> f276bff4b27fc4b2b14f2c6e2c4c24c9eaa78213
         if not os.path.abspath(filepath).startswith(os.path.abspath(UPLOAD_FOLDER)):
             return 'Caminho de arquivo inválido.', 400
         file.save(filepath)
@@ -102,6 +145,7 @@ def convert():
             os.remove(zip_path)
             return 'O arquivo enviado não é um ZIP válido.', 400
 
+<<<<<<< HEAD
         extract_dir = os.path.join(UPLOAD_FOLDER, f"extract_{name_without_ext}")
         os.makedirs(extract_dir, exist_ok=True)
         try:
@@ -119,6 +163,9 @@ def convert():
             tb = traceback.format_exc()
             return f'Erro ao descompactar: {str(e)}\n{tb}', 500
     elif action == 'zipfile':
+=======
+    if action == 'zipfile':
+>>>>>>> f276bff4b27fc4b2b14f2c6e2c4c24c9eaa78213
         zip_path = os.path.join(UPLOAD_FOLDER, f"{secure_filename(name_without_ext)}.zip")
         try:
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
@@ -163,6 +210,7 @@ def convert():
         except Exception as e:
             return f'Erro ao converter Word: {str(e)}', 500
 
+<<<<<<< HEAD
     elif action == 'excel2pdf' and filenames[0].lower().endswith(('.xls', '.xlsx', '.csv', '.ods')):
         pdf_path = os.path.join(UPLOAD_FOLDER, f"{secure_filename(name_without_ext)}.pdf")
         try:
@@ -200,6 +248,9 @@ def convert():
         ext = os.path.splitext(filenames[0])[1].lower()
         if ext not in video_exts:
             return f'Formato de vídeo não suportado: {ext}', 400
+=======
+    elif action == 'video2mp3' and filenames[0].lower().endswith('.mp4'):
+>>>>>>> f276bff4b27fc4b2b14f2c6e2c4c24c9eaa78213
         mp3_path = os.path.join(UPLOAD_FOLDER, f"{name_without_ext}.mp3")
         try:
             (
